@@ -30,16 +30,25 @@
 
 ## 开始实物台架测试
 
+下表适用于 Tronlong EPC-TL3562 工控机（本次核对的 RK3562 板，设备树型号 `SBC-TL3562-EX-TLMULTIUART`）。核对外壳端子标识和 Linux 设备节点后，在 `/etc/rk3562-dune-sensors.json` 填写对应字段。其他型号或镜像请按各自手册核对。
+
+| 传感器侧接口 | 工控机外壳端子 | Linux 串口 | 配置字段 | 串口参数 |
+|---|---|---|---|---|
+| 惯导 COMA（含 DVL 数据） | RS232 `R2 / T2 / G2` | `/dev/ttyWCH1_1` | `ins.serial` | 115200，8N1 |
+| KELLER 33X 深度计 | RS485 `A3 / B3 / G3` | `/dev/ttyS7` | `depth.serial` | 9600，8N1 |
+
+DVL A100 接惯导 COMB，由惯导通过 COMA 把数据传给工控机。端子与设备节点的对应关系已按厂家手册（PDF 第 27、29、31 页）和板端设备节点核对，实际接线后的读帧仍待现场验收。
+
 | 设备 | 核对与填写 | 怎么判断通过 |
 |---|---|---|
 | 惯导和 DVL | 按现有设备方案，DVL A100 通过 RS232 / 9600 / PD6 接惯导 COMB；工控机通过 RS232 / 115200 / 8N1 接惯导 COMA。按本板和尾线图确认针脚和实际 Linux 串口，填 `ins.serial`。 | Neptus 查 `DevDataText`（位置和状态）及 `EulerAngles`（进入导航状态后，弧度）。DVL 先保持 `confirmed_bottom_track: false`，通过诊断文本比对；在水下核对底锁、失锁、轴向、测量时效和离底距离后才打开标准 `GroundVelocity` / `Distance`。 |
 | KELLER 33X | 按该实物铭牌、标定单和尾线图核对供电及线序；用确认的 RS485 半双工端口，电源不要接入 A/B。核对 `depth.serial`、`baud`、`device_address`、`local_echo`。实测水面/空气 P1（bar），填入 `surface_pressure_bar`，按测试水体及传感器量程设置密度和最大深度。 | 使用下方的 P1 读取工具获取基准。再用 DUNE 观察 `Pressure`（Pa）、`Depth`（m）、`EntityState` 和更新时间；用已知水深复核数值。 |
 
-测深度计的水面基准时，先停止占用该串口的程序。将下方设备名和地址替换为实物确认值；有本地回显时加 `--local-echo`。工具输出 5 次读数的范围和中位数，读数稳定时将中位数填入 `surface_pressure_bar`。表压设备的基准为 0 时，按实物确认后填 0。
+测深度计的水面基准时，先停止占用该串口的程序。下方示例使用上表的串口和地址 1，请按实物确认串口和地址；有本地回显时加 `--local-echo`。工具输出 5 次读数的范围和中位数，读数稳定时将中位数填入 `surface_pressure_bar`。表压设备的基准为 0 时，按实物确认后填 0。
 
 ```sh
 sudo systemctl stop rk3562-sensor@depth
-sudo python3 /opt/rk3562-dune-sensors/read_keller_p1.py /dev/ttyUSB0 --baud 9600 --address 1
+sudo python3 /opt/rk3562-dune-sensors/read_keller_p1.py /dev/ttyS7 --baud 9600 --address 1
 ```
 
 惯导位置校准入口在本套件中未启用；深度计执行协议初始化 F48 和 F73/P1 读取，不执行硬件校零。实物串口和深度基准都要求显式填写。启动一个设备时只运行对应服务：
