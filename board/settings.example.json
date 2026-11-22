@@ -1,0 +1,33 @@
+{
+  "pc_ipv4": "",
+  "neptus_udp_port": 16003,
+  "ins": {
+    "serial": "",
+    "confirmed_bottom_track": false,
+    "system": "rk3562-ins-dvl",
+    "imc_id": "0xB0D5",
+    "udp_port": 6015
+  },
+  "depth": {
+    "serial": "",
+    "baud": 9600,
+    "device_address": 1,
+    "local_echo": false,
+    "surface_pressure_bar": null,
+    "water_density_kg_m3": 1000,
+    "maximum_depth_m": 100,
+    "system": "rk3562-keller",
+    "imc_id": "0xB0D4",
+    "udp_port": 6014
+  },
+  "ins-sim": {
+    "system": "rk3562-ins-dvl-sim",
+    "imc_id": "0xB0D7",
+    "udp_port": 6017
+  },
+  "depth-sim": {
+    "system": "rk3562-keller-sim",
+    "imc_id": "0xB0D6",
+    "udp_port": 6016
+  }
+}

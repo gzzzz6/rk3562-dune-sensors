@@ -1,0 +1,2 @@
+set(TASK_ENABLED ${DUNE_OS_LINUX})
+set(TASK_SOURCES ${TASK_DIR}/Task.cpp)

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<console name="RK3562 Sensor Bench | IMC" width="1180" height="760" resizable="true" mission-file="SensorBench.nmis">
+  <mainpanel name="console main panel">
+    <subpanel class="pt.lsts.neptus.plugins.dev.ImcCommsMonitorPanel" x="0" y="0" width="1180" height="700"><properties /></subpanel>
+  </mainpanel>
+  <mainpanel name="console alarm panel" />
+</console>

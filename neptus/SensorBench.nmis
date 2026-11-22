@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mission-def>
+  <header>
+    <id>rk3562-sensor-bench</id><name>RK3562 Sensor Bench</name><type>Test</type>
+    <description>Display context for IMC measurements.</description>
+  </header>
+  <definitions>
+    <vehicles/><maps/><checklists/>
+    <home-reference>
+      <id>unused</id><name>Unused reference</name>
+      <origin><latitude>0N0</latitude><longitude>0E0</longitude><depth>0.0</depth></origin>
+    </home-reference>
+  </definitions>
+  <body/>
+</mission-def>

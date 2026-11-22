@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.lsf*
+*.log
+*.tar.gz
+*.zip
+board.local.json

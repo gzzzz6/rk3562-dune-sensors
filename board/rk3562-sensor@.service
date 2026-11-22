@@ -1,0 +1,14 @@
+[Unit]
+Description=RK3562 DUNE sensor acquisition (%i)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -B /opt/rk3562-dune-sensors/kit.py run %i
+RuntimeDirectory=rk3562-sensor-%i
+RuntimeDirectoryMode=0700
+KillMode=mixed
+TimeoutStopSec=25s
+Restart=no
+LimitCORE=0
+UMask=0077
