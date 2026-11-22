@@ -4,7 +4,7 @@
 
 ## 拿到包后先做什么
 
-1. 在 GitHub 用 **Code → Download ZIP** 下载，或用 Git 克隆。Windows 保留一份；把解压目录复制到板子。目录里已经有两套 ARM64 程序，不需要先编译。
+1. 从 [v0.2.0 发布页](https://github.com/gzzzz6/rk3562-dune-sensors/releases/tag/v0.2.0) 下载 **`rk3562-board-arm64.tar.gz`** 和 **`neptus-windows-x64.zip`**。前者解压到板子，后者解压到 Windows x64 电脑。只做实物联调无需下载源码、安装 Java 或编译。需要复查和编译时，页面上的 Source code 包含本项目源码，`upstream-dune.tar.gz` 和 `upstream-neptus.tar.gz` 是完整的固定版本上游源码。
 2. 板端已知环境：RK3562、Tronlong-Desktop 20.04、`aarch64`、systemd、Python 3.8。检查至少有 1 GiB 空间。其他镜像先在其上跑完模拟自检。
 3. 在板子上，切换到仓库目录后安装。安装不更改板端 IP、SSH、现有 DUNE 监控或开机启动项。
 
@@ -33,7 +33,14 @@
 | 设备 | 核对与填写 | 怎么判断通过 |
 |---|---|---|
 | 惯导和 DVL | 按现有设备方案，DVL A100 通过 RS232 / 9600 / PD6 接惯导 COMB；工控机通过 RS232 / 115200 / 8N1 接惯导 COMA。按本板和尾线图确认针脚和实际 Linux 串口，填 `ins.serial`。 | Neptus 查 `DevDataText`（位置和状态）及 `EulerAngles`（进入导航状态后，弧度）。DVL 先保持 `confirmed_bottom_track: false`，通过诊断文本比对；在水下核对底锁、失锁、轴向、测量时效和离底距离后才打开标准 `GroundVelocity` / `Distance`。 |
-| KELLER 33X | 按该实物铭牌、标定单和尾线图核对供电及线序；用确认的 RS485 半双工端口，电源不要接入 A/B。核对 `depth.serial`、`baud`、`device_address`、`local_echo`。实测水面/空气 P1（bar），填入 `surface_pressure_bar`，按测试水体及传感器量程设置密度和最大深度。 | 先用已验证的 Python 工具或厂家工具在空气中读取基准并退出，避免抢串口。再用 DUNE 观察 `Pressure`（Pa）、`Depth`（m）、`EntityState` 和更新时间；用已知水深复核数值。 |
+| KELLER 33X | 按该实物铭牌、标定单和尾线图核对供电及线序；用确认的 RS485 半双工端口，电源不要接入 A/B。核对 `depth.serial`、`baud`、`device_address`、`local_echo`。实测水面/空气 P1（bar），填入 `surface_pressure_bar`，按测试水体及传感器量程设置密度和最大深度。 | 使用下方的 P1 读取工具获取基准。再用 DUNE 观察 `Pressure`（Pa）、`Depth`（m）、`EntityState` 和更新时间；用已知水深复核数值。 |
+
+测深度计的水面基准时，先停止占用该串口的程序。将下方设备名和地址替换为实物确认值；有本地回显时加 `--local-echo`。工具输出 5 次读数的范围和中位数，读数稳定时将中位数填入 `surface_pressure_bar`。表压设备的基准为 0 时，按实物确认后填 0。
+
+```sh
+sudo systemctl stop rk3562-sensor@depth
+sudo python3 /opt/rk3562-dune-sensors/read_keller_p1.py /dev/ttyUSB0 --baud 9600 --address 1
+```
 
 惯导位置校准入口在本套件中未启用；深度计执行协议初始化 F48 和 F73/P1 读取，不执行硬件校零。实物串口和深度基准都要求显式填写。启动一个设备时只运行对应服务：
 
@@ -48,7 +55,9 @@ sudo systemctl start rk3562-sensor@depth
 
 ## Windows 查看
 
-安装 [LSTS Neptus](https://github.com/LSTS/neptus) 和 Java 11。项目原环境使用 Neptus 提交 [`9fe8db6`](https://github.com/LSTS/neptus/commit/9fe8db6d61ced2f9163023fbedbf689e8eaa55c9)。在 PowerShell 进入仓库目录，填 Neptus 安装路径（包含 `bin/neptus.jar`）。如 Java 11 不在 PATH，用 `-JavaExe` 指定其可执行文件。
+解压便携包后双击 `Start-SensorBench.cmd`。运行环境已包含 Neptus IMC 查看器和 Windows x64 Java 11。软件数据窗口与板端默认使用 UDP 16003。
+
+如已有 Neptus 和 Java 11，也可从源码仓库启动。验证用的 Neptus 提交是 [`9fe8db6`](https://github.com/LSTS/neptus/commit/9fe8db6d61ced2f9163023fbedbf689e8eaa55c9)。在 PowerShell 进入仓库目录，填 Neptus 安装路径（包含 `bin/neptus.jar`）。如 Java 11 不在 PATH，用 `-JavaExe` 指定其可执行文件。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\neptus\Start-SensorBench.ps1 -NeptusHome 'C:\Apps\neptus'
@@ -72,6 +81,6 @@ sudo python3 /opt/rk3562-dune-sensors/kit.py uninstall
 
 板端程序以 [LSTS DUNE `09da1c45`](https://github.com/LSTS/dune/commit/09da1c45aa3ba4ce94cc86cdff555bc7691b869c) 为基线，新增的驱动修改见 `source/MFOSN` 与 `source/KellerDepth`；内置程序来自原 ARM64 GCC 9.4 构建，SHA-256 见 [board/SHA256SUMS](board/SHA256SUMS)。源码可按 [构建说明](source/BUILD.md) 还原。项目新增驱动于 2026-11 修改。
 
-DUNE 及派生驱动沿用上游 [修改版 EUPL v1.1](LICENCE.md)，适用于非商业用途。公开下载不会改变许可条件；商业用途须另向上游权利人取得书面授权。
+DUNE 及派生驱动沿用上游 [修改版 EUPL v1.1](LICENCE.md)。便携版 Neptus 和 Java 的来源及许可见 [第三方组件说明](packaging/THIRD-PARTY.md)，Neptus 也沿用其上游的修改版 EUPL。DUNE 和 Neptus 的商业用途须另向上游权利人取得书面授权。
 
 `source/neptus` 保存原试验控制台插件源码供对照；本联调套件使用 Neptus 内置 IMC 监视器，不加载旧插件。旧直连 DVL、LAUV 仿真和安保机模块不属于本套件。

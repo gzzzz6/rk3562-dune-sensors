@@ -150,6 +150,7 @@ def install():
         for name in ('kit.py', 'settings.example.json', 'SHA256SUMS', 'rk3562-sensor@.service'):
             shutil.copyfile(src / name, stage / name)
         shutil.copytree(src / 'simulation', stage / 'simulation', ignore=shutil.ignore_patterns('__pycache__'))
+        shutil.copyfile(src / 'read_keller_p1.py', stage / 'read_keller_p1.py')
         shutil.copytree(src / 'bin', stage / 'bin')
         shutil.copyfile(src.parent / 'LICENCE.md', stage / 'LICENCE.md')
         for mode in MODES:
