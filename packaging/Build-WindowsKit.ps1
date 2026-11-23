@@ -46,6 +46,16 @@ foreach ($folder in 'libJNI','libJNI/x64') {
 foreach ($entry in 'Start-SensorBench.ps1','Start-SensorBench.cmd','SensorBench.ncon','SensorBench.nmis') {
     Copy-Item -LiteralPath (Join-Path $repo "neptus/$entry") -Destination $out
 }
+$classes = New-Item -ItemType Directory -Path (Join-Path $out '.console-classes')
+$sources = @('AlignmentPanel.java','SensorSimPanel.java','InsMonitorPanel.java') | ForEach-Object { Join-Path $repo "source/neptus/$_" }
+$cp = @("$upstream/bin/neptus.jar","$upstream/cp.jar","$upstream/plugins/*","$upstream/deps/*","$upstream/lib/*") -join ';'
+& (Join-Path $jdk 'bin/javac.exe') --release 11 -encoding UTF-8 -cp $cp -d $classes.FullName @sources
+if ($LASTEXITCODE -ne 0) { throw 'Console build failed.' }
+& (Join-Path $jdk 'bin/jar.exe') cf (Join-Path $out 'ins-console.jar') -C $classes.FullName .
+if ($LASTEXITCODE -ne 0) { throw 'Console jar build failed.' }
+$checkedClasses = (Resolve-Path -LiteralPath $classes.FullName).Path
+if ($checkedClasses -ne (Join-Path $out '.console-classes')) { throw 'Unexpected class output path.' }
+Remove-Item -LiteralPath $checkedClasses -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'THIRD-PARTY.md') -Destination $out
 & (Join-Path $jdk 'bin/jlink.exe') --add-modules java.se,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.charsets,jdk.localedata,jdk.management --strip-debug --no-header-files --no-man-pages --compress=2 --output (Join-Path $out 'java')
 if ($LASTEXITCODE -ne 0) { throw 'Could not create bundled Java runtime.' }

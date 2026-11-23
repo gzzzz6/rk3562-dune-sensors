@@ -94,7 +94,8 @@ def config(settings, mode, runtime):
     sensor = {'Enabled': 'Always', 'Active': 'true', 'Serial Port - Device': serial}
     if is_ins:
         sensor.update({'Entity Label': 'MFOSN INS-DVL' + suffix,
-                       'Alignment Socket': '',
+                       'Alignment Socket': str(runtime / 'alignment.sock') if simulated or
+                       entry.get('allow_position_alignment') is True else '',
                        'Confirmed Bottom Track': 'true' if simulated else truth(
                            entry['confirmed_bottom_track'], 'confirmed_bottom_track')})
         sections['Sensors.MFOSN'] = sensor
@@ -147,7 +148,7 @@ def install():
     with tempfile.TemporaryDirectory(prefix='.rk3562-sensors-', dir='/opt') as scratch:
         stage = Path(scratch) / 'package'
         stage.mkdir()
-        for name in ('kit.py', 'settings.example.json', 'SHA256SUMS', 'rk3562-sensor@.service'):
+        for name in ('kit.py', 'target_alignment.py', 'settings.example.json', 'SHA256SUMS', 'rk3562-sensor@.service'):
             shutil.copyfile(src / name, stage / name)
         shutil.copytree(src / 'simulation', stage / 'simulation', ignore=shutil.ignore_patterns('__pycache__'))
         shutil.copyfile(src / 'read_keller_p1.py', stage / 'read_keller_p1.py')

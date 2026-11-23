@@ -15,13 +15,13 @@ if (-not (Test-Path -LiteralPath $core -PathType Leaf)) {
     throw 'Point -NeptusHome to an installed or built Neptus directory containing bin/neptus.jar.'
 }
 $layout = Join-Path $PSScriptRoot 'SensorBench.ncon'
-$classpath = @($root, $core, "$root/conf", "$root/cp.jar", "$root/plugins/*", "$root/deps/*", "$root/lib/*") -join ';'
+$classpath = @((Join-Path $PSScriptRoot 'ins-console.jar'), $root, $core, "$root/conf", "$root/cp.jar", "$root/plugins/*", "$root/deps/*", "$root/lib/*") -join ';'
 if (Test-Path -LiteralPath (Join-Path $root 'lib/jogl2')) {
     $classpath += ";$root/lib/jogl2/*"
 }
 $argsList = @('-Xms128m', '-Xmx2g', '--add-opens=java.base/java.lang=ALL-UNNAMED',
     '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED', "-Djava.library.path=$root/libJNI/x64;$root/libJNI",
-    '-classpath', $classpath, 'pt.lsts.neptus.loader.NeptusMain', '-f', $layout)
+    '-Ddune.ins.bench=true', '-classpath', $classpath, 'pt.lsts.neptus.loader.NeptusMain', '-f', $layout)
 Push-Location -LiteralPath $root
 try {
     & $java @argsList

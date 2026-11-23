@@ -1,10 +1,10 @@
 # RK3562 · DUNE 传感器台架联调
 
-本仓库用于采集 mFOSN 惯导（含经惯导转发的 DVL）和 KELLER 33X 深度计数据，通过 IMC 在 Windows Neptus 查看，并在板端记录 LSF。首版交付用于实物联调：驱动已通过虚拟串口验证，真实传感器还要现场验收。此套件只运行采集、显示和日志任务。
+本仓库用于采集 mFOSN 惯导（含经惯导转发的 DVL）和 KELLER 33X 深度计数据，通过 IMC 在 Windows Neptus 查看，并在板端记录 LSF。惯导与深度计实物采集已取得现场回传。位置校准默认只读，模拟联调与实物采纳分开验收。
 
 ## 拿到包后先做什么
 
-1. 从 [v0.2.0 发布页](https://github.com/gzzzz6/rk3562-dune-sensors/releases/tag/v0.2.0) 下载 **`rk3562-board-arm64.tar.gz`** 和 **`neptus-windows-x64.zip`**。前者解压到板子，后者解压到 Windows x64 电脑。只做实物联调无需下载源码、安装 Java 或编译。需要复查和编译时，页面上的 Source code 包含本项目源码，`upstream-dune.tar.gz` 和 `upstream-neptus.tar.gz` 是完整的固定版本上游源码。
+1. 从 [v0.3.0 发布页](https://github.com/gzzzz6/rk3562-dune-sensors/releases/tag/v0.3.0) 下载 **`rk3562-board-arm64.tar.gz`** 和 **`neptus-windows-x64.zip`**。前者解压到板子，后者解压到 Windows x64 电脑。只做实物联调无需下载源码、安装 Java 或编译。需要复查和编译时，页面上的 Source code 包含本项目源码，上游源码快照沿用 [v0.2.0 的附件](https://github.com/gzzzz6/rk3562-dune-sensors/releases/tag/v0.2.0)。
 2. 板端已知环境：RK3562、Tronlong-Desktop 20.04、`aarch64`、systemd、Python 3.8。检查至少有 1 GiB 空间。其他镜像先在其上跑完模拟自检。
 3. 在板子上，切换到仓库目录后安装。安装不更改板端 IP、SSH、现有 DUNE 监控或开机启动项。
 
@@ -51,7 +51,7 @@ sudo systemctl stop rk3562-sensor@depth
 sudo python3 /opt/rk3562-dune-sensors/read_keller_p1.py /dev/ttyS7 --baud 9600 --address 1
 ```
 
-惯导位置校准入口在本套件中未启用；深度计执行协议初始化 F48 和 F73/P1 读取，不执行硬件校零。实物串口和深度基准都要求显式填写。启动一个设备时只运行对应服务：
+惯导位置校准见下节；深度计执行协议初始化 F48 和 F73/P1 读取，不执行硬件校零。实物串口和深度基准都要求显式填写。启动一个设备时只运行对应服务：
 
 ```sh
 sudo python3 /opt/rk3562-dune-sensors/kit.py check ins
@@ -61,6 +61,14 @@ sudo systemctl start rk3562-sensor@depth
 ```
 
 实物来源显示为 `rk3562-ins-dvl` / `rk3562-keller`。能看到系统只说明 IMC 已通，**还要核对测量消息时间持续变化**。缺帧时不要把上次显示的数字当作新数据。出现问题用 `journalctl -u rk3562-sensor@depth -n 80 --no-pager`（或把 `depth` 换成 `ins`）排查。
+
+## 惯导位置校准与升级
+
+1. 旧版升级：备份 `/etc/rk3562-dune-sensors.json`，记录正在运行的采集服务，然后执行 `sudo python3 /opt/rk3562-dune-sensors/kit.py uninstall`。在新解压目录执行 `sudo python3 board/kit.py install`。卸载保留网络、串口设置、数据库及日志；新装后只启动之前需要的服务。
+2. Windows 解压新包并双击 `Start-SensorBench.cmd`。在「惯导与 DVL」页选择目标：发布包模拟为 B0:D7，实物为 B0:D5。确认页面的设备名、编号和本次接线一致。现有工具使用已验证的有线板地址 169.254.66.50；需配置 Windows OpenSSH 的主机信任与密钥登录。普通 IMC 查看不需要 SSH。
+3. 在「惯导位置」下展开「校准坐标」，输入十进制度参考纬度、经度并确认一次。负数表示南纬或西经。仅板端模拟时可直接试；实物需先核对板端 RS232 T2 → 惯导 COMA RX、信号地与对应串口，设备静止后，在配置的 `ins` 中加 `"allow_position_alignment": true`，并执行 `sudo systemctl restart rk3562-sensor@ins`。无需连接 DVL。固定身份不符时禁止发送，不要随意重用设备 ID。
+4. 「已提交串口」只表示完成写入。进入导航后，新的位置连续至少 1 秒在 5 米范围内才显示一致；最多等待 6 分钟，发送前已接近目标另行标明。首次实物操作保留发送前后原始帧和日志，虚拟机的回读不能代替实物采纳证据。
+5. 回退为只读：将开关改为 `false` 或移除，然后重启惯导采集服务。恢复旧安装包，可按同样卸载、安装流程使用 v0.2.0。
 
 ## Windows 查看
 
@@ -92,4 +100,4 @@ sudo python3 /opt/rk3562-dune-sensors/kit.py uninstall
 
 DUNE 及派生驱动沿用上游 [修改版 EUPL v1.1](LICENCE.md)。便携版 Neptus 和 Java 的来源及许可见 [第三方组件说明](packaging/THIRD-PARTY.md)，Neptus 也沿用其上游的修改版 EUPL。DUNE 和 Neptus 的商业用途须另向上游权利人取得书面授权。
 
-`source/neptus` 保存原试验控制台插件源码供对照；本联调套件使用 Neptus 内置 IMC 监视器，不加载旧插件。旧直连 DVL、LAUV 仿真和安保机模块不属于本套件。
+`source/neptus` 保存原试验控制台插件源码供对照；本版在内置 IMC 监视器中加载惯导位置与校准页。旧直连 DVL、LAUV 仿真和安保机模块不属于本套件。

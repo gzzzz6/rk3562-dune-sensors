@@ -4,6 +4,7 @@
   "ins": {
     "serial": "",
     "confirmed_bottom_track": false,
+    "allow_position_alignment": false,
     "system": "rk3562-ins-dvl",
     "imc_id": "0xB0D5",
     "udp_port": 6015

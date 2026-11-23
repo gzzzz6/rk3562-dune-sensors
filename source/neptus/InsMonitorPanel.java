@@ -37,7 +37,17 @@ public final class InsMonitorPanel extends ConsolePanel {
     private static final int TEST_SYSTEM = 0xb0d3;
     private static final String TITLE = "惯导与 DVL";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private volatile Sample latest;
+    private final Map<Integer,Sample> samples = new java.util.concurrent.ConcurrentHashMap<>();
+    private final String[] targets={"local","ins-sim","ins"};
+    private int selected=Boolean.getBoolean("dune.ins.bench") ? 1 : 0;
+    private AlignmentPanel alignment;
+    static String targetName(String target) {
+        if ("ins".equals(target)) return "实物惯导 · rk3562-ins-dvl · B0:D5";
+        if ("ins-sim".equals(target)) return "联调包模拟 · rk3562-ins-dvl-sim · B0:D7";
+        return "本地模拟 · rk3562-ins-dvl-test · B0:D3";
+    }
+    private Sample current() { return samples.get(new int[]{TEST_SYSTEM,0xb0d7,0xb0d5}[selected]); }
+    private boolean fresh() { Sample s=current(); return s!=null && System.nanoTime()-s.received<1_000_000_000L; }
     private Monitor monitor;
     private volatile SensorSimPanel simulation;
     private Timer refresh;
@@ -54,9 +64,11 @@ public final class InsMonitorPanel extends ConsolePanel {
 
     @Override public void initSubPanel() {
         setLayout(new BorderLayout());
-        simulation = new SensorSimPanel();
+        simulation = Boolean.getBoolean("dune.ins.bench") ? null : new SensorSimPanel();
+        alignment = new AlignmentPanel(this::fresh, targets[selected]);
         monitor = new Monitor(getConsole().getImcMsgManager(), buildView(), simulation);
         add(monitor, BorderLayout.CENTER);
+        addMenuItem(pt.lsts.neptus.i18n.I18n.text("Tools")+">惯导位置校准", null, e -> {monitor.selectReadings(); alignment.open();});
         refresh = new Timer(250, event -> render());
         refresh.start();
         render();
@@ -64,6 +76,7 @@ public final class InsMonitorPanel extends ConsolePanel {
 
     @Override public void cleanSubPanel() {
         if (refresh != null) refresh.stop();
+        if (alignment != null) alignment.close();
         if (simulation != null) simulation.close();
         if (monitor != null) monitor.cleanup();
     }
@@ -74,12 +87,12 @@ public final class InsMonitorPanel extends ConsolePanel {
             panel.acceptDepth(message.getDouble("value"));
             return;
         }
-        if (message.getSrc() != TEST_SYSTEM || message.getMgid() != DevDataText.ID_STATIC) return;
+        if ((message.getSrc() != TEST_SYSTEM && message.getSrc() != 0xb0d5 && message.getSrc() != 0xb0d7) || message.getMgid() != DevDataText.ID_STATIC) return;
         String value = message.getString("value");
         if (value != null && value.startsWith("MFOSN ")) {
             Sample sample = new Sample(value);
-            latest = sample;
-            if (panel != null) panel.acceptIns(sample);
+            samples.put(message.getSrc(), sample);
+            if (panel != null && message.getSrc()==TEST_SYSTEM) panel.acceptIns(sample);
         }
     }
 
@@ -90,10 +103,11 @@ public final class InsMonitorPanel extends ConsolePanel {
             super(manager);
             readingView = view;
             getMonitorTabHolder().insertTab(TITLE, null, view, "查看惯导记录与 DVL 测量", 0);
-            getMonitorTabHolder().insertTab("传感器模拟", null, simulation, "启停板端传感器模拟", 0);
-            getMonitorTabHolder().setSelectedComponent(simulation);
+            if (simulation != null) getMonitorTabHolder().insertTab("传感器模拟", null, simulation, "启停板端传感器模拟", 0);
+            getMonitorTabHolder().setSelectedComponent(view);
         }
 
+        void selectReadings() { getMonitorTabHolder().setSelectedComponent(readingView); }
         boolean isReadingViewSelected() {
             return getMonitorTabHolder().getSelectedComponent() == readingView;
         }
@@ -135,16 +149,23 @@ public final class InsMonitorPanel extends ConsolePanel {
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBorder(BorderFactory.createEmptyBorder(15, 18, 15, 18));
         JPanel header = new JPanel(new BorderLayout(12, 4));
-        JLabel name = new JLabel("惯导与 DVL  /  模拟数据");
+        JLabel name = new JLabel("惯导与 DVL");
         name.setFont(name.getFont().deriveFont(Font.BOLD, 17f));
         header.add(name, BorderLayout.NORTH);
-        header.add(new JLabel("rk3562-ins-dvl-test  ·  IMC B0:D3"), BorderLayout.CENTER);
+        javax.swing.JComboBox<String> target = new javax.swing.JComboBox<>();
+        for(String k:targets) target.addItem(targetName(k));
+        target.setSelectedIndex(selected); target.getAccessibleContext().setAccessibleName("目标惯导");
+        target.addActionListener(e -> {selected=target.getSelectedIndex(); alignment.target(targets[selected]);
+            rendered=null; for(JLabel label:values.values()) label.setText("—"); raw.setText(""); render();});
+        header.add(target, BorderLayout.CENTER);
         header.add(connection, BorderLayout.EAST);
         content.add(header);
         content.add(Box.createVerticalStrut(12));
         JPanel rows = new JPanel(new GridLayout(2, 2, 12, 10));
-        rows.add(group("惯导位置",
-            "纬度", "lat_deg", "经度", "lon_deg", "高度", "elevation_m"));
+        JPanel position = new JPanel(new BorderLayout());
+        position.add(group("惯导位置",
+            "纬度", "lat_deg", "经度", "lon_deg", "高度", "elevation_m"), BorderLayout.NORTH);
+        position.add(alignment, BorderLayout.CENTER); rows.add(position);
         rows.add(group("接收与有效性",
             "电脑最近收到", "last_received", "惯导状态", "nav",
             "DVL 参与导航", "dvl_fused", "DVL 测量", "dvl_valid", "DVL 数据年龄", "dvl_age_ms"));
@@ -214,7 +235,8 @@ public final class InsMonitorPanel extends ConsolePanel {
 
     private void render() {
         if (monitor == null || !isShowing() || !monitor.isReadingViewSelected()) return;
-        Sample sample = latest;
+        alignment.updateEnabled();
+        Sample sample = current();
         boolean fresh = sample != null && System.nanoTime() - sample.received < 2_000_000_000L;
         connection.setText(sample == null ? "等待惯导数据" : fresh ? "数据更新中" : "数据未更新（超过 2 秒）");
         connection.setForeground(fresh ? new Color(28, 105, 61) : new Color(132, 69, 6));
